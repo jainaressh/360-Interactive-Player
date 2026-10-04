@@ -6,10 +6,9 @@ choice panel appears near the end of a clip, and the story continues down whiche
 they pick (or a default if they don't). Flags persist across scenes, so earlier decisions can
 change later ones, and stories can loop back on themselves.
 
-> **Status: early scaffold.** The repository currently contains the story format, a sample
-> branching story, generated placeholder 360 clips, and the Unity project manifest. The C#
-> runtime (video engine, choice UI, XR input) and the Unity scene are the next step and are
-> not committed yet. See [Roadmap](#roadmap).
+> **Status: runtime written, headset test pending.** The story format, sample story, placeholder
+> clips, the full C# runtime (video engine, choice UI, XR input) and a code-driven project
+> bootstrap are in the repo. The Quest APK has not yet been run on a device. See [Roadmap](#roadmap).
 
 ---
 
@@ -19,9 +18,25 @@ change later ones, and stories can loop back on themselves.
 | --- | --- |
 | `Assets/StreamingAssets/Story/story.json` | The sample story graph *The Tape*: 10 scenes, 6 choice points, 4 endings, one loop |
 | `Assets/StreamingAssets/Clips/*.mp4` | 10 placeholder equirectangular clips (2048×1024, H.264, 6–8 s each) |
+| `Assets/Scripts/Runtime/` | The player (see [Runtime scripts](#runtime-scripts)) |
+| `Assets/Scripts/Editor/` | `ProjectBootstrap` (settings, XR, scene, APK build) and `StoryTools` (validator) |
 | `tools/make_placeholder_clips.py` | Regenerates the placeholder clips from `story.json` with ffmpeg |
+| `tools/unity-setup.ps1` | Headless Unity run that configures the project and writes the scene |
+| `tools/unity-build.ps1` | Headless APK build, then `adb install` if a Quest is connected |
 | `Packages/manifest.json` | Unity 6 package set: OpenXR, XR Management, Input System, UGUI, Newtonsoft JSON |
 | `ProjectSettings/ProjectVersion.txt` | Pins the editor to Unity 6000.0.25f1 |
+
+### Runtime scripts
+
+| Script | Role |
+| --- | --- |
+| `StoryPlayer` | The state machine: enters nodes, times the choice window, applies flags, resolves redirects, preloads branches, cuts |
+| `StoryModel` / `StoryState` / `StoryLoader` / `StoryValidation` | JSON schema, flag store with `+1` and `>=` semantics, StreamingAssets loading, graph checks |
+| `VideoPool` | N `VideoPlayer`s with render textures; one plays while the others pre-buffer likely next clips |
+| `PanoramaSkybox` | Points the `Skybox/Panoramic` material at the active video texture; mono / over-under / side-by-side |
+| `ChoiceUI` / `ChoiceButton` / `UiFactory` | World-space choice panel with timer bar, built at runtime, re-centres if you look away |
+| `PointerBase` → `GazePointer`, `ControllerPointer` | Raycast hover/select against the buttons: controller laser + trigger, gaze + trigger, gaze dwell |
+| `HeadTracking` / `DesktopLook` | HMD pose via `TrackedPoseDriver`; right-mouse-drag look-around when no HMD is active |
 
 ---
 
@@ -149,13 +164,22 @@ Image centre = forward (+Z) in Unity's panoramic skybox; the right edge quarter 
 
 ---
 
-## Opening the project
+## Opening and building
 
 1. Install **Unity 6000.0.25f1** with the **Android Build Support** module (SDK, NDK, OpenJDK).
-2. Open this folder in Unity Hub. Packages resolve from `Packages/manifest.json` on first open.
-3. Target settings for Quest (to be applied by the bootstrap script once it lands):
-   Android · ARM64 · IL2CPP · min SDK 29 · Vulkan with GLES3 fallback · ASTC · Linear colour ·
-   OpenXR with *Meta Quest Support* and the *Oculus Touch Controller* interaction profile.
+2. Either open the folder in Unity Hub and run **Interactive360 ▸ Setup Project**, or from a terminal:
+
+   ```powershell
+   .\tools\unity-setup.ps1     # configure settings + XR, write Assets/Scenes/Main.unity
+   .\tools\unity-build.ps1     # build Builds\Interactive360.apk and install over adb
+   ```
+
+   Setup applies: Android · ARM64 · IL2CPP · min SDK 29 · Vulkan with GLES3 fallback · ASTC ·
+   Linear colour · OpenXR with *Meta Quest Support* and the *Oculus Touch Controller* profile.
+3. **Test in the editor** without a headset: press Play, hold the right mouse button to look
+   around, click an option (or press Space) when the panel appears, **R** restarts.
+4. **In the headset**: point a controller at an option and pull the trigger. With no controllers
+   tracked, look at an option and pull the trigger, or just hold your gaze on it for 2 seconds.
 
 ---
 
@@ -164,10 +188,10 @@ Image centre = forward (+Z) in Unity's panoramic skybox; the right edge quarter 
 - [x] Story JSON format and sample branching story
 - [x] Placeholder 360 clip generator
 - [x] Unity 6 package manifest (OpenXR, Input System, UGUI, Newtonsoft)
-- [ ] Runtime: story engine, state/flags, video player pool with branch preloading
-- [ ] Runtime: panoramic skybox (mono + stereo), world-space choice UI with timer
-- [ ] Runtime: controller ray, gaze + trigger, gaze dwell; editor mouse-look fallback
-- [ ] Editor: one-click bootstrap (scene, XR settings, Android player settings), story validator
+- [x] Runtime: story engine, state/flags, video player pool with branch preloading
+- [x] Runtime: panoramic skybox (mono + stereo), world-space choice UI with timer
+- [x] Runtime: controller ray, gaze + trigger, gaze dwell; editor mouse-look fallback
+- [x] Editor: one-click bootstrap (scene, XR settings, Android player settings), story validator
 - [ ] Quest APK build and in-headset test
 - [ ] Hand-tracking selection, subtitles, analytics of paths taken
 
