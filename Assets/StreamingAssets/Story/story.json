@@ -1,0 +1,102 @@
+{
+  "title": "The Tape",
+  "start": "intro",
+  "defaultChoiceSeconds": 6.0,
+  "nodes": {
+    "intro": {
+      "title": "INTRO",
+      "clip": "Clips/intro.mp4",
+      "layout": "mono",
+      "choicesAt": 4.0,
+      "defaultChoice": 0,
+      "choices": [
+        { "label": "Open the door", "goto": "door" },
+        { "label": "Look out the window", "goto": "window", "set": { "sawCity": true } }
+      ]
+    },
+
+    "door": {
+      "title": "HALLWAY",
+      "clip": "Clips/door.mp4",
+      "choicesAt": 3.0,
+      "defaultChoice": 0,
+      "choices": [
+        { "label": "Go upstairs", "goto": "upstairs" },
+        { "label": "Go down to the basement", "goto": "basement" }
+      ]
+    },
+
+    "window": {
+      "title": "WINDOW",
+      "clip": "Clips/window.mp4",
+      "choicesAt": 3.0,
+      "defaultChoice": 1,
+      "choices": [
+        { "label": "Climb out", "goto": "rooftop" },
+        { "label": "Turn back", "goto": "door" }
+      ]
+    },
+
+    "upstairs": {
+      "title": "ATTIC",
+      "clip": "Clips/upstairs.mp4",
+      "choicesAt": 3.0,
+      "defaultChoice": 1,
+      "choices": [
+        { "label": "Take the tape", "goto": "basement", "set": { "hasTape": true } },
+        { "label": "Leave it", "goto": "basement" }
+      ]
+    },
+
+    "basement": {
+      "title": "BASEMENT",
+      "clip": "Clips/basement.mp4",
+      "redirect": [
+        { "when": { "hasTape": true }, "goto": "ending_true" }
+      ],
+      "choicesAt": 3.0,
+      "defaultChoice": 1,
+      "choices": [
+        { "label": "Smash the mirror", "goto": "ending_mirror" },
+        { "label": "Walk away", "goto": "intro", "set": { "loops": "+1" } }
+      ]
+    },
+
+    "rooftop": {
+      "title": "ROOFTOP",
+      "clip": "Clips/rooftop.mp4",
+      "choicesAt": 3.0,
+      "defaultChoice": 1,
+      "choices": [
+        { "label": "Jump", "goto": "ending_jump" },
+        { "label": "Wait for dawn", "goto": "ending_wait" }
+      ]
+    },
+
+    "ending_mirror": {
+      "title": "ENDING: SHARDS",
+      "clip": "Clips/ending_mirror.mp4",
+      "ending": true,
+      "next": "intro"
+    },
+    "ending_jump": {
+      "title": "ENDING: FREEFALL",
+      "clip": "Clips/ending_jump.mp4",
+      "ending": true,
+      "next": "intro"
+    },
+    "ending_wait": {
+      "title": "ENDING: DAWN",
+      "clip": "Clips/ending_wait.mp4",
+      "ending": true,
+      "next": "intro"
+    },
+    "ending_true": {
+      "title": "ENDING: THE TAPE",
+      "clip": "Clips/ending_true.mp4",
+      "ending": true,
+      "resetState": true,
+      "next": "intro"
+    }
+  }
+}
