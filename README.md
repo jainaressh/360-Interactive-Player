@@ -6,9 +6,10 @@ choice panel appears near the end of a clip, and the story continues down whiche
 they pick (or a default if they don't). Flags persist across scenes, so earlier decisions can
 change later ones, and stories can loop back on themselves.
 
-> **Status: runtime written, headset test pending.** The story format, sample story, placeholder
-> clips, the full C# runtime (video engine, choice UI, XR input) and a code-driven project
-> bootstrap are in the repo. The Quest APK has not yet been run on a device. See [Roadmap](#roadmap).
+> **Status: builds, headset test pending.** The story format, sample story, placeholder clips, the
+> full C# runtime (video engine, choice UI, XR input) and a code-driven project bootstrap are in
+> the repo, and the Quest APK builds cleanly from the command line. It has not yet been run on a
+> device. See [Roadmap](#roadmap).
 
 ---
 
@@ -192,7 +193,8 @@ Image centre = forward (+Z) in Unity's panoramic skybox; the right edge quarter 
 - [x] Runtime: panoramic skybox (mono + stereo), world-space choice UI with timer
 - [x] Runtime: controller ray, gaze + trigger, gaze dwell; editor mouse-look fallback
 - [x] Editor: one-click bootstrap (scene, XR settings, Android player settings), story validator
-- [ ] Quest APK build and in-headset test
+- [x] Quest APK builds headlessly (`tools/unity-build.ps1`, ~36 MB, 0 errors)
+- [ ] In-headset test on a Quest
 - [ ] Hand-tracking selection, subtitles, analytics of paths taken
 
 ---

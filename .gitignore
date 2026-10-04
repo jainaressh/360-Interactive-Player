@@ -46,3 +46,7 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
+
+# Gradle/CMake intermediates written beside the project by Android builds
+/.utmp/
+/.gradle/
