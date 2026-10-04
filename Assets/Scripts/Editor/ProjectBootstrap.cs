@@ -298,25 +298,53 @@ namespace Interactive360.EditorTools
 
         // ------------------------------------------------------------------ build
 
-        public static BuildReport BuildApk(string apkPath)
+        /// <summary>
+        /// Editor preferences that select the Android SDK/NDK/JDK/Gradle shipped with this editor version.
+        /// They are user-global and may point at another Unity install, so the build forces the embedded
+        /// tools for its duration and restores the previous values afterwards.
+        /// </summary>
+        static readonly string[] EmbeddedToolPrefs = { "SdkUseEmbedded", "NdkUseEmbedded", "JdkUseEmbedded", "GradleUseEmbedded" };
+
+        public static BuildReport BuildApk(string apkPath, bool useEmbeddedAndroidTools = true)
         {
             if (!File.Exists(ScenePath)) BuildScene();
             var dir = Path.GetDirectoryName(apkPath);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
-            var options = new BuildPlayerOptions
+            var saved = new System.Collections.Generic.Dictionary<string, bool?>();
+            if (useEmbeddedAndroidTools)
             {
-                scenes = new[] { ScenePath },
-                locationPathName = apkPath,
-                target = BuildTarget.Android,
-                targetGroup = BuildTargetGroup.Android,
-                options = BuildOptions.None
-            };
+                foreach (var key in EmbeddedToolPrefs)
+                {
+                    saved[key] = EditorPrefs.HasKey(key) ? EditorPrefs.GetBool(key) : (bool?)null;
+                    EditorPrefs.SetBool(key, true);
+                }
+            }
 
-            var report = BuildPipeline.BuildPlayer(options);
-            var s = report.summary;
-            Debug.Log("[Bootstrap] Build " + s.result + ": " + apkPath + " (" + (s.totalSize / (1024 * 1024)) + " MB, " + s.totalTime.TotalMinutes.ToString("0.0") + " min, " + s.totalErrors + " errors)");
-            return report;
+            try
+            {
+                var options = new BuildPlayerOptions
+                {
+                    scenes = new[] { ScenePath },
+                    locationPathName = apkPath,
+                    target = BuildTarget.Android,
+                    targetGroup = BuildTargetGroup.Android,
+                    options = BuildOptions.None
+                };
+
+                var report = BuildPipeline.BuildPlayer(options);
+                var s = report.summary;
+                Debug.Log("[Bootstrap] Build " + s.result + ": " + apkPath + " (" + (s.totalSize / (1024 * 1024)) + " MB, " + s.totalTime.TotalMinutes.ToString("0.0") + " min, " + s.totalErrors + " errors)");
+                return report;
+            }
+            finally
+            {
+                foreach (var kv in saved)
+                {
+                    if (kv.Value.HasValue) EditorPrefs.SetBool(kv.Key, kv.Value.Value);
+                    else EditorPrefs.DeleteKey(kv.Key);
+                }
+            }
         }
     }
 }

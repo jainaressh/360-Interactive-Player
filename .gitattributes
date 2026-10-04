@@ -1,0 +1,27 @@
+# Normalise line endings; Unity YAML and C# stay LF in the repo.
+* text=auto eol=lf
+
+*.cs text eol=lf diff=csharp
+*.json text eol=lf
+*.md text eol=lf
+*.ps1 text eol=crlf
+*.py text eol=lf
+
+# Unity YAML assets
+*.unity text eol=lf merge=unityyamlmerge
+*.prefab text eol=lf merge=unityyamlmerge
+*.asset text eol=lf merge=unityyamlmerge
+*.mat text eol=lf merge=unityyamlmerge
+*.meta text eol=lf merge=unityyamlmerge
+*.controller text eol=lf merge=unityyamlmerge
+*.anim text eol=lf merge=unityyamlmerge
+
+# Binary media
+*.mp4 binary
+*.mov binary
+*.png binary
+*.jpg binary
+*.wav binary
+*.ogg binary
+*.ttf binary
+*.apk binary
