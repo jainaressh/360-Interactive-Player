@@ -1,68 +1,178 @@
 # 360 Interactive Player
 
-A Meta Quest player for 360° video told as an interactive film: timed on-screen choices
-branch the story (Bandersnatch style), with flags that persist across scenes and loops.
+An interactive-film player for **Meta Quest** that plays 360° video with timed, branching
+choices in the style of *Black Mirror: Bandersnatch*. The viewer looks around a scene, a
+choice panel appears near the end of a clip, and the story continues down whichever branch
+they pick (or a default if they don't). Flags persist across scenes, so earlier decisions can
+change later ones, and stories can loop back on themselves.
 
-**Stack:** Unity 6 (6000.0.25f1), OpenXR + Meta Quest Support, Input System, UGUI,
-Newtonsoft JSON. Video is decoded by Unity's `VideoPlayer` into a render texture that
-drives a `Skybox/Panoramic` material, so mono and stereo (over-under / side-by-side)
-equirectangular footage are both supported.
+> **Status: early scaffold.** The repository currently contains the story format, a sample
+> branching story, generated placeholder 360 clips, and the Unity project manifest. The C#
+> runtime (video engine, choice UI, XR input) and the Unity scene are the next step and are
+> not committed yet. See [Roadmap](#roadmap).
 
-## Layout
+---
 
-| Path | Purpose |
+## Contents
+
+| Path | What it is |
 | --- | --- |
-| `Assets/StreamingAssets/Story/story.json` | The story graph: nodes, clips, choices, flags |
-| `Assets/StreamingAssets/Clips/` | Equirectangular MP4 clips referenced by the story |
-| `Assets/Scripts/Runtime/` | Story engine, video pool, panorama skybox, choice UI, pointers |
-| `Assets/Scripts/Editor/` | Project bootstrap (scene, XR, Android settings) and story validator |
-| `tools/make_placeholder_clips.py` | Generates labelled placeholder 360 clips with ffmpeg |
+| `Assets/StreamingAssets/Story/story.json` | The sample story graph *The Tape*: 10 scenes, 6 choice points, 4 endings, one loop |
+| `Assets/StreamingAssets/Clips/*.mp4` | 10 placeholder equirectangular clips (2048×1024, H.264, 6–8 s each) |
+| `tools/make_placeholder_clips.py` | Regenerates the placeholder clips from `story.json` with ffmpeg |
+| `Packages/manifest.json` | Unity 6 package set: OpenXR, XR Management, Input System, UGUI, Newtonsoft JSON |
+| `ProjectSettings/ProjectVersion.txt` | Pins the editor to Unity 6000.0.25f1 |
+
+---
+
+## How it will work
+
+```
+story.json ──► Story engine ──► VideoPlayer pool ──► RenderTexture ──► Skybox/Panoramic
+                   │                (current clip + preloaded branches)       (mono / stereo)
+                   │
+                   └─► Choice panel (world-space UI, timer bar)
+                           ▲
+                 controller ray · gaze + trigger · gaze dwell
+```
+
+- **Playback:** Unity's `VideoPlayer` decodes each clip into a render texture that drives a
+  `Skybox/Panoramic` material. Mono, over-under and side-by-side stereo layouts are selected
+  per scene.
+- **Seamless branching:** while a clip plays, the clips for its possible next scenes are
+  prepared on spare players, so the cut to the chosen branch happens without a stall.
+- **Choices:** a world-space panel appears at the configured time, facing the viewer, with a
+  countdown bar. If nothing is picked, the scene's default choice is taken. By default the
+  current clip finishes before the branch starts (Bandersnatch behaviour); a scene can opt
+  into cutting immediately.
+- **Input:** controller pointing with trigger, head gaze with trigger, or gaze dwell when no
+  controllers are tracked. A mouse-look fallback is planned for testing in the editor.
+- **State:** choices can set flags; scenes can redirect on entry or hide choices based on
+  those flags.
+
+---
 
 ## Story format
+
+Everything about the film lives in one JSON file so writers can edit it without touching Unity.
 
 ```json
 {
   "title": "The Tape",
   "start": "intro",
   "defaultChoiceSeconds": 6.0,
+  "cutOnChoice": false,
   "nodes": {
     "intro": {
+      "title": "INTRO",
       "clip": "Clips/intro.mp4",
       "layout": "mono",
       "choicesAt": 4.0,
       "defaultChoice": 0,
       "choices": [
-        { "label": "Open the door", "goto": "door" },
-        { "label": "Look out the window", "goto": "window", "set": { "sawCity": true } }
+        { "label": "Open the door",        "goto": "door" },
+        { "label": "Look out the window",  "goto": "window", "set": { "sawCity": true } }
       ]
     },
     "basement": {
       "clip": "Clips/basement.mp4",
       "redirect": [ { "when": { "hasTape": true }, "goto": "ending_true" } ],
-      "choices": [ "..." ]
+      "choices": [
+        { "label": "Smash the mirror", "goto": "ending_mirror" },
+        { "label": "Walk away",        "goto": "intro", "set": { "loops": "+1" } }
+      ]
     },
-    "ending_true": { "clip": "Clips/ending_true.mp4", "ending": true, "resetState": true, "next": "intro" }
+    "ending_true": {
+      "clip": "Clips/ending_true.mp4",
+      "ending": true,
+      "resetState": true,
+      "next": "intro"
+    }
   }
 }
 ```
 
-- `choicesAt` / `choiceSeconds` control when the choice panel appears and how long it stays.
-- If the window closes with no input, `defaultChoice` is taken.
-- `set` writes flags when a choice is taken (`"+1"` increments a counter).
-- `redirect` rules run when a node is entered and send the viewer elsewhere based on flags.
-- `when` on a choice hides it unless the flags match (supports `">=2"` style comparisons).
-- `next` continues without choices; `ending` marks finales; `resetState` clears flags.
+### Story-level fields
+
+| Field | Meaning |
+| --- | --- |
+| `start` | Id of the first node |
+| `defaultChoiceSeconds` | If a node has no `choicesAt`, the panel opens this many seconds before the clip ends |
+| `cutOnChoice` | `false` = finish the current clip after a choice, `true` = cut at once |
+
+### Node fields
+
+| Field | Meaning |
+| --- | --- |
+| `clip` | Path relative to `StreamingAssets`, or an `http(s)://` URL |
+| `layout` | `mono`, `over-under` or `side-by-side` |
+| `choicesAt` | Clip time (seconds) when the choice panel appears |
+| `choiceSeconds` | How long the window stays open (default: until the clip ends) |
+| `defaultChoice` | Index taken when the window closes with no input |
+| `holdLastFrame` | Pause on the last frame and wait instead of taking the default |
+| `choices[]` | `label`, `goto`, optional `set` (flags to write) and `when` (flags required to show it) |
+| `redirect[]` | Checked on entry: first rule whose `when` matches sends the viewer to `goto` instead |
+| `next` | Where to go when there are no choices |
+| `ending` | Marks a finale (for UI and validation) |
+| `resetState` | Clears all flags when entered |
+
+Flag values can be booleans, numbers or strings. In `set`, `"+1"` / `"-1"` add to a counter.
+In `when`, strings like `">=2"`, `"<5"` or `"!=0"` compare numerically.
+
+### The sample story
+
+```
+intro ─┬─ door ─┬─ upstairs ─┬─ take tape ─► basement ─(hasTape)─► ENDING: THE TAPE
+       │        │            └─ leave it  ─► basement ─┬─ smash ─► ENDING: SHARDS
+       │        └─ basement (same as above)            └─ walk away ─► intro (loop)
+       └─ window ─┬─ climb out ─► rooftop ─┬─ jump ─► ENDING: FREEFALL
+                  └─ turn back ─► door     └─ wait ─► ENDING: DAWN
+```
+
+---
 
 ## Placeholder clips
 
+The committed clips are synthetic test footage so the branching logic can be exercised before
+real 360 video exists. Each one shows its scene title, a **FRONT / LEFT / BACK / RIGHT**
+compass so orientation is obvious in the headset, a horizon line, a running timecode, and a
+green **CHOICE WINDOW OPEN** banner from `choicesAt` onward. Each has a distinct tone so audio
+routing can be checked too.
+
+Regenerate them (requires `ffmpeg` on PATH):
+
 ```bash
-python tools/make_placeholder_clips.py --width 2048 --seconds 8
+python tools/make_placeholder_clips.py --width 2048 --seconds 8 --force
 ```
 
-Each clip shows its scene title, a FRONT / LEFT / BACK / RIGHT compass, a horizon line,
-a timecode, and a banner from `choicesAt` onward so timing can be checked in-headset.
+Image centre = forward (+Z) in Unity's panoramic skybox; the right edge quarter is +X.
 
-## Target settings (Quest)
+---
 
-Android, ARM64, IL2CPP, min SDK 29, Vulkan (GLES3 fallback), ASTC, linear colour,
-OpenXR with Meta Quest Support and the Oculus Touch interaction profile.
+## Opening the project
+
+1. Install **Unity 6000.0.25f1** with the **Android Build Support** module (SDK, NDK, OpenJDK).
+2. Open this folder in Unity Hub. Packages resolve from `Packages/manifest.json` on first open.
+3. Target settings for Quest (to be applied by the bootstrap script once it lands):
+   Android · ARM64 · IL2CPP · min SDK 29 · Vulkan with GLES3 fallback · ASTC · Linear colour ·
+   OpenXR with *Meta Quest Support* and the *Oculus Touch Controller* interaction profile.
+
+---
+
+## Roadmap
+
+- [x] Story JSON format and sample branching story
+- [x] Placeholder 360 clip generator
+- [x] Unity 6 package manifest (OpenXR, Input System, UGUI, Newtonsoft)
+- [ ] Runtime: story engine, state/flags, video player pool with branch preloading
+- [ ] Runtime: panoramic skybox (mono + stereo), world-space choice UI with timer
+- [ ] Runtime: controller ray, gaze + trigger, gaze dwell; editor mouse-look fallback
+- [ ] Editor: one-click bootstrap (scene, XR settings, Android player settings), story validator
+- [ ] Quest APK build and in-headset test
+- [ ] Hand-tracking selection, subtitles, analytics of paths taken
+
+---
+
+## License
+
+Not yet chosen. All placeholder media in this repo is generated and free to reuse.
